@@ -1,14 +1,20 @@
-import  ModeToggle  from "@/components/ModeToggle"
-import { Button } from "@/components/ui/button"
-import { SignedOut, SignInButton, SignedIn, UserButton } from "@clerk/nextjs"
+import CreatePost from "@/components/CreatePost";
+import WhoToFollow from "@/components/WhoToFollow";
+import { currentUser } from "@clerk/nextjs/server";
+import { Suspense } from "react";
 
-const page = () => {
+export default async function Home() {
+  const user = await currentUser();
   return (
-    <div className="m-4">
-      <h1> Home page content</h1>
-
+    <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
+      <div className="lg:col-span-6">
+        {user ? <CreatePost /> : null}
+      </div>
+      <div className="hidden lg:col-span-4 lg:block sticky top-20">
+        <Suspense fallback={null}>
+          <WhoToFollow />
+        </Suspense>
+      </div>
     </div>
-  )
+  );
 }
-
-export default page
