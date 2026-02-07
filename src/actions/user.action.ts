@@ -24,11 +24,10 @@ export async function syncUser() {
             `${user.firstName || ""} ${user.lastName || ""}`.trim() || username;
 
         // Use upsert to avoid race conditions and duplicate-key errors
+        // Only update email and image from Clerk — name/username are user-editable
         const dbUser = await prisma.user.upsert({
             where: { clerkId: userId },
             update: {
-                name,
-                username,
                 email,
                 image: user.imageUrl,
             },
