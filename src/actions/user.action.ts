@@ -8,27 +8,43 @@ export async function syncUser() {
     try {
         const { userId } = await auth();
         const user = await currentUser();
-        if (!user || !userId) return;
-        const existingUser = await prisma.user.findUnique({
-            where: {
-                clerkId: userId
-            }
 
-        })
-        if (existingUser) return existingUser;
+        if (!user || !userId) return null;
 
-        const dbUser = await prisma.user.create({
-            data: {
+        // Safely extract fields — Clerk may not always provide all of them
+        const email = user.emailAddresses?.[0]?.emailAddress;
+        if (!email) {
+            console.error("syncUser: Clerk user has no email address", userId);
+            return null;
+        }
+
+        const username =
+            user.username ?? email.split("@")[0];
+        const name =
+            `${user.firstName || ""} ${user.lastName || ""}`.trim() || username;
+
+        // Use upsert to avoid race conditions and duplicate-key errors
+        const dbUser = await prisma.user.upsert({
+            where: { clerkId: userId },
+            update: {
+                name,
+                username,
+                email,
+                image: user.imageUrl,
+            },
+            create: {
                 clerkId: userId,
-                name: `${user.firstName || ""} ${user.lastName || ""}`,
-                username: user.username ?? user.emailAddresses[0].emailAddress.split("@")[0],
-                email: user.emailAddresses[0].emailAddress,
+                name,
+                username,
+                email,
                 image: user.imageUrl,
             },
         });
+
         return dbUser;
     } catch (error) {
-        console.error("Error syncing user:", error);
+        console.error("syncUser error:", error);
+        return null;
     }
 }
 
@@ -57,10 +73,20 @@ export async function getDbUserId() {
     const { userId: clerkId } = await auth();
     if (!clerkId) return null;
 
-    const user = await getUserByClerkId(clerkId);
-    if (!user) throw new Error("User not found in database");
+    // Try to find the user, if missing sync from Clerk first
+    let user = await getUserByClerkId(clerkId);
 
-    return user.id;
+    if (!user) {
+        // New user — syncUser creates them in the DB
+        const synced = await syncUser();
+        if (!synced) {
+            console.error("getDbUserId: could not sync user", clerkId);
+            return null;
+        }
+        user = await getUserByClerkId(clerkId);
+    }
+
+    return user?.id ?? null;
 }
 
 export async function getRandomUsers() {

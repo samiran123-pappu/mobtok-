@@ -13,12 +13,8 @@ function createPrismaClient() {
     throw new Error("Missing DATABASE_URL environment variable");
   }
 
-  // Ensure sslmode=verify-full to avoid security warning
-  const url = new URL(connectionString);
-  url.searchParams.set("sslmode", "verify-full");
-
   const pool = new Pool({
-    connectionString: url.toString(),
+    connectionString,
     max: 5,
     idleTimeoutMillis: 30000,
   });
