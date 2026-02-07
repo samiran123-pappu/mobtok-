@@ -55,7 +55,7 @@ export async function getUserByClerkId(clerkId: string) {
 
 export async function getDbUserId() {
     const { userId: clerkId } = await auth();
-    if (!clerkId) throw new Error("Not authenticated");
+    if (!clerkId) return null;
 
     const user = await getUserByClerkId(clerkId);
     if (!user) throw new Error("User not found in database");
@@ -65,7 +65,7 @@ export async function getDbUserId() {
 
 export async function getRandomUsers() {
     try {
-        const userId = await getDbUserId().catch(() => null);
+        const userId = await getDbUserId();
         if (!userId) return [];
 
         const randomUsers = await prisma.user.findMany({
@@ -137,8 +137,6 @@ export async function toggleFollow(targetUserId: string) {
           },
         },
       });
-      revalidatePath("/");
-      return { success: true, isFollowing: false };
     } else {
       // follow
       await prisma.$transaction([
@@ -157,9 +155,10 @@ export async function toggleFollow(targetUserId: string) {
           },
         }),
       ]);
-      revalidatePath("/");
-      return { success: true, isFollowing: true };
     }
+
+    revalidatePath("/");
+    return { success: true };
   } catch (error) {
     console.log("Error in toggleFollow", error);
     return { success: false, error: "Error toggling follow" };
